@@ -22,7 +22,6 @@ export default function AdminDashboard({
     <div>
       <h3 className="mb-4">Admin Dashboard</h3>
       
-      {/* Stats Cards */}
       <div className="row mb-4">
         <div className="col-md-3 mb-3">
           <div className="card bg-primary text-white">
@@ -57,8 +56,7 @@ export default function AdminDashboard({
           </div>
         </div>
       </div>
-
-      {/* Bookings Table */}
+      
       <div className="card">
         <div className="card-header">
           <h5 className="mb-0">All Bookings</h5>
@@ -157,7 +155,6 @@ export default function AdminDashboard({
         </div>
       </div>
 
-      {/* Staff Members */}
       <div className="card mt-4">
         <div className="card-header">
           <h5 className="mb-0">Staff Members ({stats.activeStaff})</h5>
