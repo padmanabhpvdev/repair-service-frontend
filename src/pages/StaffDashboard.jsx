@@ -20,7 +20,6 @@ export default function StaffDashboard({
         Welcome, {formData.name}! You have {myAssignments.length} assigned jobs.
       </div>
 
-      {/* My Assignments */}
       <div className="card">
         <div className="card-header">
           <h5 className="mb-0">My Assigned Jobs</h5>
@@ -95,7 +94,6 @@ export default function StaffDashboard({
         </div>
       </div>
 
-      {/* Available Pending Jobs */}
       <div className="card mt-4">
         <div className="card-header">
           <h5 className="mb-0">Available Pending Jobs</h5>
