@@ -74,19 +74,24 @@ export default function MainPage(){
                         </div>
                     </div><br />
                 </div>
-            </section>
-            <section id="contact">
-                <h1>Contact</h1>
-                <p>Lorem ipsum dolor</p>
-                <p>Lorem ipsum dolor</p>
-                <p>Lorem ipsum dolor</p>
-                <p>Lorem ipsum dolor</p>
-                <p>Lorem ipsum dolor</p>
-                <p>Lorem ipsum dolor</p>
-                <p>Lorem ipsum dolor</p>
-                <p>Lorem ipsum dolor</p>
-                <p>Lorem ipsum dolor</p>
-                <p>Lorem ipsum dolor</p>
+            </section><br />
+            <section id="contact" className="container-fluid">
+                <h1 className="text-center text-primary fw-bold">Contact</h1><br />
+                <div className="container">
+                    <div className="row">
+                        <div className="col">
+                            <ul className="mt-3 lh-lg" style={{listStyleType:'none'}}>
+                                <li className="fs-3"><i className="fa fa-envelope"></i> <strong className="text-primary">info@kkauto.com</strong></li>
+                                <li className="fs-3"><i className="fa fa-phone"></i> <strong className="text-primary">+91 9876543210</strong></li>
+                                <li className="fs-3"><i className="fab fa-instagram"></i> <strong className="text-primary">kkauto_tvm</strong></li>
+                                <li className="fs-3"><i className="fab fa-x-twitter"></i> <strong className="text-primary">kkauto_twitter</strong></li>
+                            </ul>
+                        </div>
+                        <div className="col">
+                                <iframe src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d986.3314368982441!2d76.8860309!3d8.5646426!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3b05bee2f4878db5%3A0x44f9cf2f3f7bcd8f!2sDepartment%20of%20Computer%20Science%2C%20University%20of%20Kerala!5e0!3m2!1sen!2sin!4v1768294699100!5m2!1sen!2sin" width="800" height="450" style={{border:'0'}} allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade" className="shadow-lg"></iframe>
+                        </div>
+                    </div>
+                </div>
             </section>
         </div>
     )
