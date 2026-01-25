@@ -9,13 +9,18 @@ export default function StaffDashboard({
   completeBooking, 
   assignStaffToBooking,
   formData,
-  addWorkUpdate
+  addWorkUpdate,
+  updatePaymentStatus
 }) {
   const myAssignments = staffAssignments.filter(a => a.staffEmail === formData.email);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [workUpdateText, setWorkUpdateText] = useState('');
   const [selectedTask, setSelectedTask] = useState('');
   const [showUpdateForm, setShowUpdateForm] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentNote, setPaymentNote] = useState('');
 
   const selectedBookingDetails = selectedBooking 
     ? bookings.find(b => b.id === selectedBooking)
@@ -46,6 +51,27 @@ export default function StaffDashboard({
     setWorkUpdateText('');
     setSelectedTask('');
     setShowUpdateForm(false);
+  };
+
+  const handlePaymentSubmit = () => {
+    if (!paymentAmount || !selectedBooking) return;
+    
+    if (updatePaymentStatus) {
+      updatePaymentStatus(selectedBooking, {
+        amount: parseFloat(paymentAmount),
+        method: paymentMethod,
+        status: 'paid',
+        note: paymentNote,
+        date: new Date().toISOString(),
+        collectedBy: formData.name
+      });
+    }
+    
+    alert(`Payment of ₹${paymentAmount} recorded successfully for Booking #${selectedBooking}`);
+    setPaymentAmount('');
+    setPaymentMethod('cash');
+    setPaymentNote('');
+    setShowPaymentModal(false);
   };
 
   const getStatusFromUpdate = (updateText) => {
@@ -83,6 +109,35 @@ export default function StaffDashboard({
     return slots[timeSlot] || timeSlot;
   };
 
+  const getPaymentBadge = (paymentStatus) => {
+    const colors = {
+      'paid': 'success',
+      'partial': 'warning',
+      'pending': 'danger'
+    };
+    return (
+      <span className={`badge bg-${colors[paymentStatus] || 'secondary'}`}>
+        <i className={`fa fa-${paymentStatus === 'paid' ? 'check-circle' : paymentStatus === 'partial' ? 'exclamation-circle' : 'clock'} me-1`}></i>
+        {paymentStatus}
+      </span>
+    );
+  };
+
+  const paymentStats = {
+    totalCollected: myAssignments.reduce((sum, assignment) => {
+      const booking = bookings.find(b => b.id === assignment.bookingId);
+      return sum + (booking?.paymentStatus === 'paid' ? booking.amount : 0);
+    }, 0),
+    pendingCollection: myAssignments.reduce((sum, assignment) => {
+      const booking = bookings.find(b => b.id === assignment.bookingId);
+      return sum + (booking?.paymentStatus === 'pending' ? booking.amount : 0);
+    }, 0),
+    partialPayments: myAssignments.reduce((sum, assignment) => {
+      const booking = bookings.find(b => b.id === assignment.bookingId);
+      return sum + (booking?.paymentStatus === 'partial' ? booking.amount : 0);
+    }, 0)
+  };
+
   return (
     <div>
       <h3 className="mb-4">Staff Dashboard</h3>
@@ -91,6 +146,123 @@ export default function StaffDashboard({
         <i className="fa fa-user me-2"></i>
         Welcome, {formData.name}! You have {myAssignments.length} assigned jobs.
       </div>
+
+      {showPaymentModal && selectedBookingDetails && (
+        <div className="modal show d-block" style={{backgroundColor: 'rgba(0,0,0,0.5)'}}>
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">
+                  <i className="fa fa-credit-card me-2"></i>
+                  Record Payment
+                </h5>
+                <button 
+                  type="button" 
+                  className="btn-close" 
+                  onClick={() => {
+                    setShowPaymentModal(false);
+                    setPaymentAmount('');
+                    setPaymentMethod('cash');
+                    setPaymentNote('');
+                  }}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="alert alert-info mb-3">
+                  <p className="mb-1"><strong>Booking #:</strong> {selectedBookingDetails.id}</p>
+                  <p className="mb-1"><strong>Customer:</strong> {selectedBookingDetails.customer}</p>
+                  <p className="mb-1"><strong>Amount Due:</strong> ₹{selectedBookingDetails.amount}</p>
+                  <p className="mb-0"><strong>Current Status:</strong> {getPaymentBadge(selectedBookingDetails.paymentStatus)}</p>
+                </div>
+                
+                <div className="mb-3">
+                  <label className="form-label">Payment Amount *</label>
+                  <div className="input-group">
+                    <span className="input-group-text">₹</span>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      placeholder="Enter amount"
+                      min="0"
+                      max={selectedBookingDetails.amount}
+                    />
+                  </div>
+                  <small className="text-muted">
+                    Full amount: ₹{selectedBookingDetails.amount} | 
+                    Remaining: ₹{selectedBookingDetails.amount - (selectedBookingDetails.paidAmount || 0)}
+                  </small>
+                </div>
+                
+                <div className="mb-3">
+                  <label className="form-label">Payment Method *</label>
+                  <select 
+                    className="form-select"
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="card">Credit/Debit Card</option>
+                    <option value="upi">UPI</option>
+                    <option value="netbanking">Net Banking</option>
+                    <option value="wallet">Digital Wallet</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                
+                <div className="mb-3">
+                  <label className="form-label">Payment Note (Optional)</label>
+                  <textarea 
+                    className="form-control"
+                    rows="2"
+                    value={paymentNote}
+                    onChange={(e) => setPaymentNote(e.target.value)}
+                    placeholder="Add any notes about this payment..."
+                  ></textarea>
+                </div>
+                
+                <div className="mb-3">
+                  <div className="form-check">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      id="generateReceipt"
+                      defaultChecked
+                    />
+                    <label className="form-check-label" htmlFor="generateReceipt">
+                      Generate payment receipt
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => {
+                    setShowPaymentModal(false);
+                    setPaymentAmount('');
+                    setPaymentMethod('cash');
+                    setPaymentNote('');
+                  }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-success"
+                  onClick={handlePaymentSubmit}
+                  disabled={!paymentAmount || parseFloat(paymentAmount) <= 0}
+                >
+                  <i className="fa fa-check me-1"></i>Record Payment
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showUpdateForm && (
         <div className="modal show d-block" style={{backgroundColor: 'rgba(0,0,0,0.5)'}}>
@@ -114,6 +286,7 @@ export default function StaffDashboard({
                     <p className="mb-1"><strong>Booking #:</strong> {selectedBookingDetails.id}</p>
                     <p className="mb-1"><strong>Vehicle:</strong> {vehicleType.find(v => v.value === selectedBookingDetails.vehicleType)?.label}</p>
                     <p className="mb-1"><strong>Service:</strong> {serviceType.find(s => s.value === selectedBookingDetails.serviceType)?.label}</p>
+                    <p className="mb-0"><strong>Payment:</strong> {getPaymentBadge(selectedBookingDetails.paymentStatus)} ₹{selectedBookingDetails.amount}</p>
                   </div>
                 )}
                 
@@ -213,6 +386,8 @@ export default function StaffDashboard({
                         <th>Customer</th>
                         <th>Vehicle</th>
                         <th>Service</th>
+                        <th>Amount</th>
+                        <th>Payment</th>
                         <th>Date</th>
                         <th>Status</th>
                         <th>Actions</th>
@@ -223,12 +398,25 @@ export default function StaffDashboard({
                         const booking = bookings.find(b => b.id === assignment.bookingId);
                         if (!booking) return null;
                         
+                        const isPaymentDue = booking.paymentStatus === 'pending' || booking.paymentStatus === 'partial';
+                        
                         return (
                           <tr key={assignment.bookingId}>
                             <td>#{booking.id}</td>
                             <td>{booking.customer}</td>
                             <td>{vehicleType.find(v => v.value === booking.vehicleType)?.label}</td>
                             <td>{serviceType.find(s => s.value === booking.serviceType)?.label}</td>
+                            <td>
+                              <strong className={isPaymentDue ? 'text-danger' : 'text-success'}>
+                                ₹{booking.amount}
+                              </strong>
+                            </td>
+                            <td>
+                              {getPaymentBadge(booking.paymentStatus)}
+                              {booking.paidAmount && booking.paidAmount > 0 && (
+                                <div className="small text-muted">Paid: ₹{booking.paidAmount}</div>
+                              )}
+                            </td>
                             <td>
                               <small>{formatDate(booking.date)}</small><br/>
                               <small className="text-muted">{getTimeSlotLabel(booking.time)}</small>
@@ -244,7 +432,7 @@ export default function StaffDashboard({
                                   className="btn btn-outline-primary"
                                   onClick={() => {
                                     setSelectedBooking(booking.id);
-                                    alert(`Booking #${booking.id}\nCustomer: ${booking.customer}\nVehicle: ${vehicleType.find(v => v.value === booking.vehicleType)?.label}\nIssue: ${booking.description}\nStatus: ${booking.status}`);
+                                    alert(`Booking #${booking.id}\nCustomer: ${booking.customer}\nVehicle: ${vehicleType.find(v => v.value === booking.vehicleType)?.label}\nIssue: ${booking.description}\nStatus: ${booking.status}\nPayment: ${booking.paymentStatus} - ₹${booking.amount}`);
                                   }}
                                 >
                                   <i className="fa fa-eye"></i>
@@ -259,6 +447,18 @@ export default function StaffDashboard({
                                 >
                                   <i className="fa fa-plus"></i> Update
                                 </button>
+                                
+                                {isPaymentDue && (
+                                  <button 
+                                    className="btn btn-outline-success"
+                                    onClick={() => {
+                                      setSelectedBooking(booking.id);
+                                      setShowPaymentModal(true);
+                                    }}
+                                  >
+                                    <i className="fa fa-credit-card"></i> Payment
+                                  </button>
+                                )}
                                 
                                 {booking.status === 'in-progress' && (
                                   <button 
@@ -364,6 +564,40 @@ export default function StaffDashboard({
             </div>
           </div>
 
+          <div className="card mb-4">
+            <div className="card-header">
+              <h6 className="mb-0">Payment Summary</h6>
+            </div>
+            <div className="card-body">
+              <div className="mb-3">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <span>Total Collected:</span>
+                  <strong className="text-success">₹{paymentStats.totalCollected}</strong>
+                </div>
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <span>Pending Collection:</span>
+                  <strong className="text-danger">₹{paymentStats.pendingCollection}</strong>
+                </div>
+                <div className="d-flex justify-content-between align-items-center">
+                  <span>Partial Payments:</span>
+                  <strong className="text-warning">₹{paymentStats.partialPayments}</strong>
+                </div>
+              </div>
+              
+              <div className="progress mb-2" style={{height: '8px'}}>
+                <div 
+                  className="progress-bar bg-success" 
+                  style={{width: `${paymentStats.totalCollected > 0 ? (paymentStats.totalCollected / (paymentStats.totalCollected + paymentStats.pendingCollection) * 100) : 0}%`}}
+                  title="Payment Collection Rate"
+                ></div>
+              </div>
+              <small className="text-muted d-block text-center">
+                Collection Rate: {paymentStats.totalCollected > 0 ? 
+                  Math.round((paymentStats.totalCollected / (paymentStats.totalCollected + paymentStats.pendingCollection)) * 100) : 0}%
+              </small>
+            </div>
+          </div>
+
           <div className="card">
             <div className="card-header">
               <h6 className="mb-0">Quick Actions</h6>
@@ -414,18 +648,17 @@ export default function StaffDashboard({
                 <button 
                   className="btn btn-outline-info"
                   onClick={() => {
-                    const today = new Date().toISOString().split('T')[0];
-                    const todayJobs = myAssignments.filter(a => {
+                    const pendingPayments = myAssignments.filter(a => {
                       const booking = bookings.find(b => b.id === a.bookingId);
-                      return booking?.createdAt === today;
+                      return booking?.paymentStatus === 'pending';
                     });
-                    alert(`Today's Jobs: ${todayJobs.length}\nCompleted: ${todayJobs.filter(j => {
-                      const booking = bookings.find(b => b.id === j.bookingId);
-                      return booking?.status === 'completed';
-                    }).length}`);
+                    alert(`Pending Payments: ${pendingPayments.length}\nTotal Due: ₹${pendingPayments.reduce((sum, job) => {
+                      const booking = bookings.find(b => b.id === job.bookingId);
+                      return sum + (booking?.amount || 0);
+                    }, 0)}`);
                   }}
                 >
-                  <i className="fa fa-chart-bar me-2"></i>Today's Report
+                  <i className="fa fa-credit-card me-2"></i>Payment Report
                 </button>
               </div>
             </div>
@@ -433,7 +666,7 @@ export default function StaffDashboard({
         </div>
       </div>
 
-      {selectedBooking && selectedBookingDetails && !showUpdateForm && (
+      {selectedBooking && selectedBookingDetails && !showUpdateForm && !showPaymentModal && (
         <div className="card mt-4">
           <div className="card-header d-flex justify-content-between align-items-center">
             <h6 className="mb-0">Job Details: Booking #{selectedBooking}</h6>
@@ -450,6 +683,7 @@ export default function StaffDashboard({
                 <h6>Customer & Vehicle Info</h6>
                 <div className="mb-3">
                   <p className="mb-1"><strong>Customer:</strong> {selectedBookingDetails.customer}</p>
+                  <p className="mb-1"><strong>Contact:</strong> {selectedBookingDetails.phone || 'N/A'}</p>
                   <p className="mb-1"><strong>Vehicle:</strong> {vehicleType.find(v => v.value === selectedBookingDetails.vehicleType)?.label}</p>
                   <p className="mb-1"><strong>Model:</strong> {selectedBookingDetails.vehicleModel || 'Not specified'}</p>
                   <p className="mb-1"><strong>Service Date:</strong> {formatDate(selectedBookingDetails.date)}</p>
@@ -457,11 +691,22 @@ export default function StaffDashboard({
                 </div>
               </div>
               <div className="col-md-6">
-                <h6>Service Details</h6>
+                <h6>Service & Payment Details</h6>
                 <div className="mb-3">
                   <p className="mb-1"><strong>Service Type:</strong> {serviceType.find(s => s.value === selectedBookingDetails.serviceType)?.label}</p>
-                  <p className="mb-1"><strong>Amount:</strong> ₹{selectedBookingDetails.amount}</p>
-                  <p className="mb-1"><strong>Status:</strong> {selectedBookingDetails.status}</p>
+                  <p className="mb-1"><strong>Amount:</strong> 
+                    <span className={selectedBookingDetails.paymentStatus === 'paid' ? 'text-success' : 'text-danger'}>
+                      ₹{selectedBookingDetails.amount}
+                    </span>
+                  </p>
+                  <p className="mb-1"><strong>Payment Status:</strong> {getPaymentBadge(selectedBookingDetails.paymentStatus)}</p>
+                  {selectedBookingDetails.paidAmount > 0 && (
+                    <p className="mb-1"><strong>Paid Amount:</strong> ₹{selectedBookingDetails.paidAmount}</p>
+                  )}
+                  {selectedBookingDetails.paymentDate && (
+                    <p className="mb-1"><strong>Payment Date:</strong> {formatDate(selectedBookingDetails.paymentDate)}</p>
+                  )}
+                  <p className="mb-1"><strong>Service Status:</strong> {selectedBookingDetails.status}</p>
                   <p className="mb-1"><strong>Booked On:</strong> {formatDate(selectedBookingDetails.createdAt)}</p>
                 </div>
               </div>
@@ -497,13 +742,22 @@ export default function StaffDashboard({
               </div>
             )}
             
-            <div className="d-flex gap-2">
+            <div className="d-flex gap-2 flex-wrap">
               <button 
                 className="btn btn-primary"
                 onClick={() => setShowUpdateForm(true)}
               >
                 <i className="fa fa-plus me-1"></i>Add Work Update
               </button>
+              
+              {(selectedBookingDetails.paymentStatus === 'pending' || selectedBookingDetails.paymentStatus === 'partial') && (
+                <button 
+                  className="btn btn-success"
+                  onClick={() => setShowPaymentModal(true)}
+                >
+                  <i className="fa fa-credit-card me-1"></i>Record Payment
+                </button>
+              )}
               
               {selectedBookingDetails.status === 'in-progress' && (
                 <button 
@@ -537,6 +791,13 @@ export default function StaffDashboard({
                   <i className="fa fa-play me-1"></i>Start Job
                 </button>
               )}
+              
+              <button 
+                className="btn btn-outline-secondary"
+                onClick={() => window.print()}
+              >
+                <i className="fa fa-print me-1"></i>Print Details
+              </button>
             </div>
           </div>
         </div>
@@ -566,6 +827,12 @@ export default function StaffDashboard({
                         <p className="mb-1"><strong>Customer:</strong> {booking.customer}</p>
                         <p className="mb-1"><strong>Vehicle:</strong> {vehicleType.find(v => v.value === booking.vehicleType)?.label}</p>
                         <p className="mb-1"><strong>Service:</strong> {serviceType.find(s => s.value === booking.serviceType)?.label}</p>
+                        <p className="mb-1">
+                          <strong>Amount:</strong> 
+                          <span className={booking.paymentStatus === 'paid' ? 'text-success' : 'text-danger'}>
+                            ₹{booking.amount} ({booking.paymentStatus})
+                          </span>
+                        </p>
                         <p className="mb-1"><strong>Date:</strong> {formatDate(booking.date)}</p>
                         <p className="mb-2">
                           <strong>Issue:</strong> 
