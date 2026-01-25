@@ -1,16 +1,23 @@
 import { useState } from 'react';
 
-export default function BookingHistory({ formData, bookings, staffAssignments, workUpdates, userRole, onAddFeedback }) {
+export default function BookingHistory({ formData, bookings, staffAssignments, workUpdates, userRole, onAddFeedback, onMakePayment }) {
   const [expandedBooking, setExpandedBooking] = useState(null);
   const [filter, setFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [bookingFeedbacks, setBookingFeedbacks] = useState({});
+  const [paymentFilter, setPaymentFilter] = useState('all');
 
   const userBookings = bookings
-    .filter(booking =>userRole === 'admin' ? true : booking.email === formData.email)
+    .filter(booking => 
+      userRole === 'admin' ? true : booking.email === formData.email
+    )
     .filter(booking => {
       if (filter === 'all') return true;
       return booking.status === filter;
+    })
+    .filter(booking => {
+      if (paymentFilter === 'all') return true;
+      return booking.paymentStatus === paymentFilter;
     })
     .sort((a, b) => {
       switch(sortBy) {
@@ -20,7 +27,10 @@ export default function BookingHistory({ formData, bookings, staffAssignments, w
           return b.amount - a.amount;
         case 'amount-low':
           return a.amount - b.amount;
-        default: // newest
+        case 'payment-due':
+          const paymentOrder = { 'pending': 1, 'partial': 2, 'paid': 3 };
+          return paymentOrder[a.paymentStatus] - paymentOrder[b.paymentStatus];
+        default:
           return new Date(b.createdAt) - new Date(a.createdAt);
       }
     });
@@ -130,12 +140,26 @@ export default function BookingHistory({ formData, bookings, staffAssignments, w
     });
   };
 
+  const handleMakePayment = (booking) => {
+    if (onMakePayment) {
+      onMakePayment(booking);
+    } else {
+      alert(`Proceeding to payment for Booking #${booking.id}\nAmount: ₹${booking.amount}\n\nBackend use chei`);
+    }
+  };
+
   const stats = {
     total: userBookings.length,
     completed: userBookings.filter(b => b.status === 'completed').length,
     inProgress: userBookings.filter(b => b.status === 'in-progress').length,
     pending: userBookings.filter(b => b.status === 'pending').length,
     totalSpent: userBookings.reduce((sum, b) => sum + b.amount, 0),
+    pendingPayments: userBookings
+      .filter(b => b.paymentStatus === 'pending' || b.paymentStatus === 'partial')
+      .reduce((sum, b) => sum + b.amount, 0),
+    paidAmount: userBookings
+      .filter(b => b.paymentStatus === 'paid')
+      .reduce((sum, b) => sum + b.amount, 0),
     avgRating: userBookings
       .filter(b => b.feedback)
       .reduce((sum, b) => sum + b.feedback.rating, 0) / 
@@ -162,6 +186,16 @@ export default function BookingHistory({ formData, bookings, staffAssignments, w
           </select>
           <select 
             className="form-select form-select-sm w-auto"
+            value={paymentFilter}
+            onChange={(e) => setPaymentFilter(e.target.value)}
+          >
+            <option value="all">All Payments</option>
+            <option value="paid">Paid</option>
+            <option value="pending">Pending</option>
+            <option value="partial">Partial</option>
+          </select>
+          <select 
+            className="form-select form-select-sm w-auto"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
           >
@@ -169,6 +203,7 @@ export default function BookingHistory({ formData, bookings, staffAssignments, w
             <option value="oldest">Oldest First</option>
             <option value="amount-high">Amount (High to Low)</option>
             <option value="amount-low">Amount (Low to High)</option>
+            <option value="payment-due">Payment Due</option>
           </select>
         </div>
       </div>
@@ -177,7 +212,7 @@ export default function BookingHistory({ formData, bookings, staffAssignments, w
         <div className="col-md-2 col-6 mb-3">
           <div className="card bg-primary text-white">
             <div className="card-body text-center p-3">
-              <h6 className="card-title mb-1">Total</h6>
+              <h6 className="card-title mb-1">Total Bookings</h6>
               <h4 className="mb-0">{stats.total}</h4>
             </div>
           </div>
@@ -199,23 +234,23 @@ export default function BookingHistory({ formData, bookings, staffAssignments, w
           </div>
         </div>
         <div className="col-md-2 col-6 mb-3">
-          <div className="card bg-secondary text-white">
-            <div className="card-body text-center p-3">
-              <h6 className="card-title mb-1">Pending</h6>
-              <h4 className="mb-0">{stats.pending}</h4>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-2 col-6 mb-3">
           <div className="card bg-info text-white">
             <div className="card-body text-center p-3">
-              <h6 className="card-title mb-1">Total Spent</h6>
-              <h4 className="mb-0">₹{stats.totalSpent}</h4>
+              <h6 className="card-title mb-1">Total Paid</h6>
+              <h4 className="mb-0">₹{stats.paidAmount}</h4>
             </div>
           </div>
         </div>
         <div className="col-md-2 col-6 mb-3">
           <div className="card bg-danger text-white">
+            <div className="card-body text-center p-3">
+              <h6 className="card-title mb-1">Pending Payments</h6>
+              <h4 className="mb-0">₹{stats.pendingPayments}</h4>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-2 col-6 mb-3">
+          <div className="card bg-secondary text-white">
             <div className="card-body text-center p-3">
               <h6 className="card-title mb-1">Avg Rating</h6>
               <h4 className="mb-0">{stats.avgRating.toFixed(1)}/5</h4>
@@ -231,6 +266,7 @@ export default function BookingHistory({ formData, bookings, staffAssignments, w
             const isCompleted = booking.status === 'completed';
             const hasFeedback = booking.feedback;
             const canGiveFeedback = isCompleted && !hasFeedback && userRole !== 'admin';
+            const paymentDue = booking.paymentStatus === 'pending' || booking.paymentStatus === 'partial';
             
             return (
               <div className="accordion-item mb-3" key={booking.id}>
@@ -248,11 +284,19 @@ export default function BookingHistory({ formData, bookings, staffAssignments, w
                       </div>
                       <div className="d-flex align-items-center gap-3">
                         {getStatusBadge(booking.status)}
-                        <span className="fw-bold text-success">₹{booking.amount}</span>
+                        <span className={`fw-bold ${paymentDue ? 'text-danger' : 'text-success'}`}>
+                          ₹{booking.amount}
+                          {paymentDue && <small className="ms-1">(Due)</small>}
+                        </span>
                         <span className="text-muted">
                           <i className="fa fa-calendar me-1"></i>
                           {formatDate(booking.date)}
                         </span>
+                        {paymentDue && (
+                          <span className="badge bg-danger">
+                            <i className="fa fa-exclamation-circle me-1"></i>Payment Due
+                          </span>
+                        )}
                         {canGiveFeedback && (
                           <span className="badge bg-warning text-dark">
                             <i className="fa fa-star me-1"></i>Rate Us!
@@ -305,11 +349,23 @@ export default function BookingHistory({ formData, bookings, staffAssignments, w
                           </div>
                           <div className="col-6 mb-2">
                             <small className="text-muted">Amount</small>
-                            <p className="mb-0 fw-bold text-success">₹{booking.amount}</p>
+                            <p className={`mb-0 fw-bold ${paymentDue ? 'text-danger' : 'text-success'}`}>
+                              ₹{booking.amount}
+                            </p>
                           </div>
                           <div className="col-6 mb-2">
                             <small className="text-muted">Payment Status</small>
-                            <p className="mb-0">{getPaymentBadge(booking.paymentStatus)}</p>
+                            <div className="d-flex align-items-center gap-2">
+                              {getPaymentBadge(booking.paymentStatus)}
+                              {paymentDue && (
+                                <button 
+                                  className="btn btn-sm btn-danger"
+                                  onClick={() => handleMakePayment(booking)}
+                                >
+                                  <i className="fa fa-credit-card me-1"></i>Pay Now
+                                </button>
+                              )}
+                            </div>
                           </div>
                           {booking.completedDate && (
                             <div className="col-6 mb-2">
@@ -356,6 +412,74 @@ export default function BookingHistory({ formData, bookings, staffAssignments, w
                         )}
                       </div>
                     </div>
+
+                    {paymentDue && (
+                      <div className="card border-danger mb-4">
+                        <div className="card-header bg-danger text-white">
+                          <h6 className="mb-0">
+                            <i className="fa fa-credit-card me-2"></i>Payment Required
+                          </h6>
+                        </div>
+                        <div className="card-body">
+                          <div className="row align-items-center">
+                            <div className="col-md-8">
+                              <h5 className="text-danger">
+                                <i className="fa fa-exclamation-triangle me-2"></i>
+                                Payment Pending: ₹{booking.amount}
+                              </h5>
+                              <p className="mb-2">
+                                Your payment for <strong>Booking #{booking.id}</strong> is currently <span className="badge bg-danger">{booking.paymentStatus}</span>.
+                              </p>
+                              <p className="text-muted small mb-0">
+                                <i className="fa fa-info-circle me-1"></i>
+                                Please complete your payment to finalize this booking. You can pay using any of the methods below.
+                              </p>
+                            </div>
+                            <div className="col-md-4 text-end">
+                              <button 
+                                className="btn btn-danger btn-lg w-100 mb-2"
+                                onClick={() => handleMakePayment(booking)}
+                              >
+                                <i className="fa fa-credit-card me-2"></i>Pay ₹{booking.amount}
+                              </button>
+                              <small className="text-muted">
+                                Secure payment via Razorpay, UPI (GPay/PayTM), Cards or Net Banking
+                              </small>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-4 pt-3 border-top">
+                            <h6 className="mb-3">Payment Methods Available:</h6>
+                            <div className="row text-center">
+                              <div className="col-3">
+                                <div className="border rounded p-2 mb-2">
+                                  <i className="fa fa-credit-card fa-2x text-primary mb-2"></i>
+                                  <p className="mb-0 small">Credit/Debit Card</p>
+                                </div>
+                              </div>
+                              <div className="col-3">
+                                <div className="border rounded p-2 mb-2">
+                                  <i className="fa fa-mobile-alt fa-2x text-success mb-2"></i>
+                                  <p className="mb-0 small">UPI</p>
+                                </div>
+                              </div>
+                              <div className="col-3">
+                                <div className="border rounded p-2 mb-2">
+                                  <i className="fa fa-university fa-2x text-info mb-2"></i>
+                                  <p className="mb-0 small">Net Banking</p>
+                                </div>
+                              </div>
+                              <div className="col-3">
+                                <div className="border rounded p-2 mb-2">
+                                  <i className="fa fa-wallet fa-2x text-warning mb-2"></i>
+                                  <p className="mb-0 small">Wallet</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="card">
                       <div className="card-header bg-light">
@@ -483,45 +607,16 @@ export default function BookingHistory({ formData, bookings, staffAssignments, w
                         )}
                       </div>
                     )}
-
-                    <div className="mt-4 pt-3 border-top">
-                      <div className="btn-group">
-                        <button className="btn btn-outline-primary btn-sm">
-                          <i className="fa fa-print me-1"></i>Print Invoice
-                        </button>
-                        <button className="btn btn-outline-secondary btn-sm">
-                          <i className="fa fa-download me-1"></i>Download Report
-                        </button>
-                        {booking.status === 'completed' && booking.feedback && (
-                          <button className="btn btn-outline-info btn-sm">
-                            <i className="fa fa-star me-1"></i>View Your Rating
-                          </button>
-                        )}
-                        {booking.status === 'pending' && (
-                          <button className="btn btn-outline-warning btn-sm">
-                            <i className="fa fa-edit me-1"></i>Reschedule
-                          </button>
-                        )}
-                        {userRole === 'admin' && (
-                          <button className="btn btn-outline-danger btn-sm">
-                            <i className="fa fa-trash me-1"></i>Delete Record
-                          </button>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
             );
-          })
-        ) : (
+          })) : (
           <div className="text-center py-5">
             <i className="fa fa-calendar-times fa-3x text-muted mb-3"></i>
             <h5>No Booking History Found</h5>
             <p className="text-muted">
-              {userRole === 'admin' 
-                ? 'No bookings found in the system.' 
-                : 'You haven\'t booked any services yet.'}
+              {userRole === 'admin' ? 'No bookings found in the system.': 'You haven\'t booked any services yet.'}
             </p>
           </div>
         )}
